@@ -16,6 +16,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * 职责：委派模式，请求分发，任务调度
@@ -24,6 +25,8 @@ import java.util.*;
 public class LgDispatchServlet extends HttpServlet {
 
     private LgApplicationContext applicationContext;
+
+    private List<LgHandlerMapping> handlerMappings = new ArrayList<>();
 
     // handlerMapping,key为url,value为方法
     private Map<String, Method> handlerMapping = new HashMap<>(16);
@@ -52,16 +55,15 @@ public class LgDispatchServlet extends HttpServlet {
      * @throws Exception 异常
      */
     private void doDispatch(HttpServletRequest req, HttpServletResponse resp) throws Exception {
-        String uri = req.getRequestURI();
-        String contextPath = req.getContextPath();
-        String url = uri.replace(contextPath,"").replaceAll("/+","/");
+        LgHandlerMapping handlerMapping = getHandler(req);
 
-        if (!this.handlerMapping.containsKey(url)) {
+
+        if (handlerMapping == null) {
             resp.getWriter().write("404 Not Found!!!");
             return;
         }
 
-        Method method = this.handlerMapping.get(url);
+        Method method = handlerMapping.getMethod();
         // 获取请求参数
         Map<String,String[]> paramMap = req.getParameterMap();
         // 获取方法形参列表
@@ -99,6 +101,19 @@ public class LgDispatchServlet extends HttpServlet {
         method.invoke(applicationContext.getBean(beanName),paramValues);
     }
 
+    private LgHandlerMapping getHandler(HttpServletRequest req) {
+        if (this.handlerMappings.isEmpty()) {return null;}
+        String uri = req.getRequestURI();
+        String contextPath = req.getContextPath();
+        String url = uri.replace(contextPath,"").replaceAll("/+","/");
+        for (LgHandlerMapping mapping : this.handlerMappings) {
+            if (mapping.getUrl().equals(uri)) {
+                return mapping;
+            }
+        }
+        return null;
+    }
+
     @Override
     public void init(ServletConfig config) throws ServletException {
         // 初始化IOC容器
@@ -119,7 +134,8 @@ public class LgDispatchServlet extends HttpServlet {
         if (this.applicationContext.getBeanDefinitionCount() == 0) {return;}
 
         for (String beanName : this.applicationContext.getBeanDefinitionNames()) {
-            Class<?> clazz = this.applicationContext.getBean(beanName).getClass();
+            Object instance = this.applicationContext.getBean(beanName);
+            Class<?> clazz = instance.getClass();
 
             // 提取controller注解上的url
             String classUrl = "";
@@ -134,10 +150,12 @@ public class LgDispatchServlet extends HttpServlet {
                 // 提取方放上的url
                 LgRequestMapping lgRequestMapping = method.getAnnotation(LgRequestMapping.class);
                 // 保证url为/xxx/xxx
-                String url = String.format("/%s/%s",classUrl,lgRequestMapping.value()).replaceAll("/+","/");
+                String regex = String.format("/%s/%s",classUrl,lgRequestMapping.value().replaceAll("\\*",".*")).replaceAll("/+","/");
+                Pattern pattern = Pattern.compile(regex);
                 // 匹配url和方放进行反射调用
-                handlerMapping.put(url,method);
-                System.out.println(String.format("Mapping:%s------->%s",url,method));
+                //handlerMapping.put(url,method);
+                handlerMappings.add(new LgHandlerMapping(pattern,method,instance));
+                System.out.println(String.format("Mapping:%s------->%s",regex,method));
             }
         }
     }
