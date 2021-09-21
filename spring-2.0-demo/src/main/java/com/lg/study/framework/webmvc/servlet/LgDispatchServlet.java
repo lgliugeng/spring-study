@@ -23,15 +23,7 @@ import java.util.*;
  */
 public class LgDispatchServlet extends HttpServlet {
 
-    private LgApplicationContext lgApplicationContext;
-
-    private Properties contextConfig = new Properties();
-
-    // 享元模式，保存所有扫描的类
-    private List<String> classNames = new ArrayList<>(16);
-
-    // IOC容器,key为首字符小写的类名，value为实例
-    private Map<String,Object> IOC = new HashMap<>(16);
+    private LgApplicationContext applicationContext;
 
     // handlerMapping,key为url,value为方法
     private Map<String, Method> handlerMapping = new HashMap<>(16);
@@ -104,31 +96,13 @@ public class LgDispatchServlet extends HttpServlet {
         // 获取方法所在类的beanName
         String beanName = toLowerFirstCase(method.getDeclaringClass().getSimpleName());
         // 反射执行方法
-        method.invoke(IOC.get(beanName),paramValues);
+        method.invoke(applicationContext.getBean(beanName),paramValues);
     }
 
     @Override
     public void init(ServletConfig config) throws ServletException {
         // 初始化IOC容器
-        lgApplicationContext = new LgApplicationContext();
-        // 1.加载配置文件
-        doLoadConfig(config.getInitParameter("contentConfigLocation"));
-        System.out.println("============加载配置完成==============");
-        // 2.扫描相关类
-        doScannerClass(contextConfig.getProperty("scanPackage"));
-        System.out.println("============扫描类完成==============");
-
-        //=================IOC部分===================
-        // 3.创建IOC容器，将相关类实例化并存入IOC容器
-        doInstance();
-        System.out.println("============IOC容器实例化完成==============");
-        //=================AOP=====================
-        System.out.println("============AOP执行完成==============");
-        //=================DI部分===================
-        // 4.进行DI注入
-        doAutowired();
-        System.out.println("============DI注入完成==============");
-
+        applicationContext = new LgApplicationContext(config.getInitParameter("contextConfigLocation"));
         //=================MVC部分===================
         // 5.初始化HandlerMapping
         doInitHandlerMapping();
@@ -142,10 +116,10 @@ public class LgDispatchServlet extends HttpServlet {
      * 初始化HandlerMapping
      */
     private void doInitHandlerMapping() {
-        if (IOC.isEmpty()) {return;}
+        if (this.applicationContext.getBeanDefinitionCount() == 0) {return;}
 
-        for (Map.Entry<String, Object> iocEntry : IOC.entrySet()) {
-            Class<?> clazz = iocEntry.getValue().getClass();
+        for (String beanName : this.applicationContext.getBeanDefinitionNames()) {
+            Class<?> clazz = this.applicationContext.getBean(beanName).getClass();
 
             // 提取controller注解上的url
             String classUrl = "";
@@ -168,131 +142,9 @@ public class LgDispatchServlet extends HttpServlet {
         }
     }
 
-    /**
-     * 依赖注入
-     */
-    private void doAutowired() {
-        if (IOC.isEmpty()) {return;}
-
-        for (Map.Entry<String, Object> iocEntry : IOC.entrySet()) {
-            // 把所有的包括private/protected/default/public 修饰字段都取出来
-            for (Field field : iocEntry.getValue().getClass().getDeclaredFields()) {
-                // 没有注解不进行注入
-                if (!field.isAnnotationPresent(LgAutowired.class)) {continue;}
-
-                LgAutowired lgAutowired = field.getAnnotation(LgAutowired.class);
-                // 获取注解自定义beanName
-                String beanName = lgAutowired.value().trim();
-                if ("".equals(beanName.trim())) {
-                    // 通过类型去获取beanName
-                    beanName = field.getType().getName();
-                }
-                // 暴力访问
-                field.setAccessible(true);
-
-                try {
-                    // 当前实例根据beanName进行注入
-                    field.set(iocEntry.getValue(),IOC.get(beanName));
-                } catch (IllegalAccessException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
-    /**
-     * IOC实例化
-     */
-    private void doInstance() {
-        if (classNames.isEmpty()) {return;}
-
-        for (String className : classNames) {
-            try {
-                Class<?> clazz = Class.forName(className);
-                if (clazz.isAnnotationPresent(LgController.class)) {
-                    // 获取ioc的beanName和bean实例
-                    String beanName = toLowerFirstCase(clazz.getSimpleName());
-                    Object instance = clazz.newInstance();
-                    IOC.put(beanName,instance);
-                } else if (clazz.isAnnotationPresent(LgService.class)) {
-                    // 1.在自定义名称中，必须全局唯一
-                    String beanName = clazz.getAnnotation(LgService.class).value();
-
-                    // 2.默认名称时小写
-                    if ("".equals(beanName.trim())) {
-                        toLowerFirstCase(clazz.getSimpleName());
-                    }
-                    // 3.实例化
-                    Object instance = clazz.newInstance();
-                    IOC.put(beanName, instance);
-                    // 4.如果是接口，判断有多少个实现类，有多个则需要异常
-                    for (Class<?> i : clazz.getInterfaces()) {
-                        if (IOC.containsKey(i.getName())) {
-                            throw new Exception(String.format("This %s is exits",i.getName()));
-                        }
-                        IOC.put(i.getName(),instance);
-                    }
-                } else {
-                    continue;
-                }
-            } catch (InstantiationException e) {
-                e.printStackTrace();
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
     private String toLowerFirstCase(String simpleName) {
         char[] chars = simpleName.toCharArray();
         chars[0] += 32;
         return new String(chars);
-    }
-
-    /**
-     * 类扫描
-     * @param scanPackage 包路径
-     */
-    private void doScannerClass(String scanPackage) {
-        URL url = this.getClass().getClassLoader().getResource(String.format("/%s",scanPackage.replaceAll("\\.","/")));
-        File classPath = new File(url.getFile());
-
-        // 文件夹获取所有类
-        for (File file : classPath.listFiles()) {
-            if (file.isDirectory()) {
-                // 递归
-                doScannerClass(String.format("%s.%s",scanPackage,file.getName()));
-            } else {
-                // class文件才进行保存
-                if (!file.getName().endsWith(".class")) {continue;}
-                String className = String.format("%s.%s",scanPackage,file.getName().replace(".class",""));
-                // className可通过Class.forName进行实例化
-                classNames.add(className);
-            }
-
-        }
-    }
-
-    /**
-     * 读取配置文件
-     * @param contextConfigLocation
-     */
-    private void doLoadConfig(String contextConfigLocation) {
-        InputStream is = this.getClass().getClassLoader().getResourceAsStream(contextConfigLocation);
-        try {
-            contextConfig.load(is);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }finally {
-            if (null != is) {
-                try {
-                    is.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
     }
 }

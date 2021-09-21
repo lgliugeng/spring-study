@@ -10,8 +10,8 @@
     <servlet-name>lgMvc</servlet-name>
     <servlet-class>com.lg.study.framework.webmvc.servlet.LgDispatchServlet</servlet-class>
     <init-param>
-      <param-name>contentConfigLocation</param-name>
-      <param-value>application.properties</param-value>
+      <param-name>contextConfigLocation</param-name>
+      <param-value>classpath:application.properties</param-value>
     </init-param>
     <load-on-startup>1</load-on-startup>
   </servlet>
