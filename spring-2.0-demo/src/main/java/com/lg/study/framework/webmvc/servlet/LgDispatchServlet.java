@@ -57,20 +57,20 @@ public class LgDispatchServlet extends HttpServlet {
      * @throws Exception 异常
      */
     private void doDispatch(HttpServletRequest req, HttpServletResponse resp) throws Exception {
-        LgHandlerMapping handlerMapping = getHandler(req);
+        LgHandlerMapping handler = getHandler(req);
 
 
-        if (handlerMapping == null) {
+        if (handler == null) {
             processDispatchResult(req,resp,new LgModelAndView("404"));
             //resp.getWriter().write("404 Not Found!!!");
             return;
         }
 
         // 2.根据一个handlerMapping获取一个handlerAdapter
-        LgHandlerAdapter handler = getHandlerAdapter(handlerMapping);
+        LgHandlerAdapter ha = getHandlerAdapter(handler);
 
         // 3.解析某一个方法的形参和返回值之后，统一封装成modelAndView对象
-        LgModelAndView modelAndView = handler.handler(req,resp,handlerMapping);
+        LgModelAndView modelAndView = ha.handler(req,resp,handler);
 
         processDispatchResult(req,resp,modelAndView);
 
