@@ -28,6 +28,8 @@ public class LgDispatchServlet extends HttpServlet {
 
     private List<LgHandlerMapping> handlerMappings = new ArrayList<>();
 
+    private Map<LgHandlerMapping,LgHandlerAdapter> handlerAdapters = new HashMap<>(16);
+
     // handlerMapping,key为url,value为方法
     private Map<String, Method> handlerMapping = new HashMap<>(16);
 
@@ -59,11 +61,20 @@ public class LgDispatchServlet extends HttpServlet {
 
 
         if (handlerMapping == null) {
-            resp.getWriter().write("404 Not Found!!!");
+            processDispatchResult(req,resp,new LgModelAndView("404"));
+            //resp.getWriter().write("404 Not Found!!!");
             return;
         }
 
-        Method method = handlerMapping.getMethod();
+        // 2.根据一个handlerMapping获取一个handlerAdapter
+        LgHandlerAdapter handler = getHandlerAdapter(handlerMapping);
+
+        // 3.解析某一个方法的形参和返回值之后，统一封装成modelAndView对象
+        LgModelAndView modelAndView = handler.handler(req,resp,handlerMapping);
+
+        processDispatchResult(req,resp,modelAndView);
+
+        /*Method method = handlerMapping.getMethod();
         // 获取请求参数
         Map<String,String[]> paramMap = req.getParameterMap();
         // 获取方法形参列表
@@ -98,7 +109,14 @@ public class LgDispatchServlet extends HttpServlet {
         // 获取方法所在类的beanName
         String beanName = toLowerFirstCase(method.getDeclaringClass().getSimpleName());
         // 反射执行方法
-        method.invoke(applicationContext.getBean(beanName),paramValues);
+        method.invoke(applicationContext.getBean(beanName),paramValues);*/
+    }
+
+    private LgHandlerAdapter getHandlerAdapter(LgHandlerMapping handlerMapping) {
+        return null;
+    }
+
+    private void processDispatchResult(HttpServletRequest req, HttpServletResponse resp, LgModelAndView lgModelAndView) {
     }
 
     private LgHandlerMapping getHandler(HttpServletRequest req) {
@@ -119,12 +137,34 @@ public class LgDispatchServlet extends HttpServlet {
         // 初始化IOC容器
         applicationContext = new LgApplicationContext(config.getInitParameter("contextConfigLocation"));
         //=================MVC部分===================
+        initStrategies(applicationContext);
         // 5.初始化HandlerMapping
         doInitHandlerMapping();
         System.out.println("============初始化HandlerMapping完成==============");
 
         System.out.println("Lg Spring framework is init.");
 
+    }
+
+    public void initStrategies(LgApplicationContext context) {
+        //this.initMultipartResolver(context);
+        //this.initLocaleResolver(context);
+        //this.initThemeResolver(context);
+        this.initHandlerMappings(context);
+        this.initHandlerAdapters(context);
+        //this.initHandlerExceptionResolvers(context);
+        //this.initRequestToViewNameTranslator(context);
+        this.initViewResolvers(context);
+        //this.initFlashMapManager(context);
+    }
+
+    private void initViewResolvers(LgApplicationContext context) {
+    }
+
+    private void initHandlerAdapters(LgApplicationContext context) {
+    }
+
+    private void initHandlerMappings(LgApplicationContext context) {
     }
 
     /**

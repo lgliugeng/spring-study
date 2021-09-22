@@ -12,6 +12,10 @@ public class LgModelAndView {
         this.model = model;
     }
 
+    public LgModelAndView(String viewName) {
+        this.viewName = viewName;
+    }
+
     public String getViewName() {
         return viewName;
     }
