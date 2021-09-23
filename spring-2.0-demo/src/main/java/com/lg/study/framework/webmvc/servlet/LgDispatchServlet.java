@@ -72,51 +72,17 @@ public class LgDispatchServlet extends HttpServlet {
         // 3.解析某一个方法的形参和返回值之后，统一封装成modelAndView对象
         LgModelAndView modelAndView = ha.handler(req,resp,handler);
 
+        // 4.把modelAndView对象变成viewResolver
         processDispatchResult(req,resp,modelAndView);
-
-        /*Method method = handlerMapping.getMethod();
-        // 获取请求参数
-        Map<String,String[]> paramMap = req.getParameterMap();
-        // 获取方法形参列表
-        Class<?>[] paramTypes = method.getParameterTypes();
-        // 参数值
-        Object[] paramValues = new Object[paramTypes.length];
-
-        for (int i = 0; i < paramTypes.length; i++) {
-            Class<?> paramType = paramTypes[i];
-            if (HttpServletRequest.class.equals(paramType)) {
-                paramValues[i] = req;
-            } else if (HttpServletResponse.class.equals(paramType)) {
-                paramValues[i] = resp;
-            } else if (String.class.equals(paramType)) {
-                //通过运行时的状态去拿参数注解
-                Annotation[][] annotations = method.getParameterAnnotations();
-                for (int i1 = 0; i1 < annotations.length; i1++) {
-                    for (Annotation a : annotations[i1]) {
-                        if (a instanceof LgRequestParam) {
-                            String paramName = ((LgRequestParam) a).value();
-                            if (!"".equals(paramName.trim())) {
-                                paramValues[i] = Arrays.toString(paramMap.get(paramName))
-                                        .replaceAll("\\[|\\]","")
-                                        .replaceAll("\\s+",",");
-                            }
-                        }
-                    }
-                }
-                
-            }
-        }
-        // 获取方法所在类的beanName
-        String beanName = toLowerFirstCase(method.getDeclaringClass().getSimpleName());
-        // 反射执行方法
-        method.invoke(applicationContext.getBean(beanName),paramValues);*/
     }
 
-    private LgHandlerAdapter getHandlerAdapter(LgHandlerMapping handlerMapping) {
-        return null;
+    private LgHandlerAdapter getHandlerAdapter(LgHandlerMapping handler) {
+        if (this.handlerAdapters.isEmpty()) {return null;}
+        return this.handlerAdapters.get(handler);
     }
 
-    private void processDispatchResult(HttpServletRequest req, HttpServletResponse resp, LgModelAndView lgModelAndView) {
+    private void processDispatchResult(HttpServletRequest req, HttpServletResponse resp, LgModelAndView modelAndView) {
+        if (modelAndView == null) {return;}
     }
 
     private LgHandlerMapping getHandler(HttpServletRequest req) {
@@ -125,7 +91,7 @@ public class LgDispatchServlet extends HttpServlet {
         String contextPath = req.getContextPath();
         String url = uri.replace(contextPath,"").replaceAll("/+","/");
         for (LgHandlerMapping mapping : this.handlerMappings) {
-            if (mapping.getUrl().equals(uri)) {
+            if (mapping.getUrl().equals(url)) {
                 return mapping;
             }
         }
@@ -137,9 +103,8 @@ public class LgDispatchServlet extends HttpServlet {
         // 初始化IOC容器
         applicationContext = new LgApplicationContext(config.getInitParameter("contextConfigLocation"));
         //=================MVC部分===================
+        // 初始化九大组件
         initStrategies(applicationContext);
-        // 5.初始化HandlerMapping
-        doInitHandlerMapping();
         System.out.println("============初始化HandlerMapping完成==============");
 
         System.out.println("Lg Spring framework is init.");
@@ -162,19 +127,16 @@ public class LgDispatchServlet extends HttpServlet {
     }
 
     private void initHandlerAdapters(LgApplicationContext context) {
+        for (LgHandlerMapping handler : this.handlerMappings) {
+            handlerAdapters.put(handler,new LgHandlerAdapter());
+        }
     }
 
     private void initHandlerMappings(LgApplicationContext context) {
-    }
+        if (context.getBeanDefinitionCount() == 0) {return;}
 
-    /**
-     * 初始化HandlerMapping
-     */
-    private void doInitHandlerMapping() {
-        if (this.applicationContext.getBeanDefinitionCount() == 0) {return;}
-
-        for (String beanName : this.applicationContext.getBeanDefinitionNames()) {
-            Object instance = this.applicationContext.getBean(beanName);
+        for (String beanName : context.getBeanDefinitionNames()) {
+            Object instance = context.getBean(beanName);
             Class<?> clazz = instance.getClass();
 
             // 提取controller注解上的url
@@ -198,11 +160,5 @@ public class LgDispatchServlet extends HttpServlet {
                 System.out.println(String.format("Mapping:%s------->%s",regex,method));
             }
         }
-    }
-
-    private String toLowerFirstCase(String simpleName) {
-        char[] chars = simpleName.toCharArray();
-        chars[0] += 32;
-        return new String(chars);
     }
 }
