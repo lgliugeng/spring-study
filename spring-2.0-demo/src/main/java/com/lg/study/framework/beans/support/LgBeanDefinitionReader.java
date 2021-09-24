@@ -52,6 +52,10 @@ public class LgBeanDefinitionReader {
         return result;
     }
 
+    public Properties getConfig() {
+        return contextConfig;
+    }
+
     private String getBeanNameByCustomer(Class<?> beanClass) {
         String beanName = "";
         if (beanClass.isAnnotationPresent(LgController.class)) {

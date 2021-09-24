@@ -30,6 +30,8 @@ public class LgDispatchServlet extends HttpServlet {
 
     private Map<LgHandlerMapping,LgHandlerAdapter> handlerAdapters = new HashMap<>(16);
 
+    private List<LgViewResolver> viewResolvers = new ArrayList<>();
+
     // handlerMapping,key为url,value为方法
     private Map<String, Method> handlerMapping = new HashMap<>(16);
 
@@ -81,8 +83,15 @@ public class LgDispatchServlet extends HttpServlet {
         return this.handlerAdapters.get(handler);
     }
 
-    private void processDispatchResult(HttpServletRequest req, HttpServletResponse resp, LgModelAndView modelAndView) {
+    private void processDispatchResult(HttpServletRequest req, HttpServletResponse resp, LgModelAndView modelAndView) throws Exception {
         if (modelAndView == null) {return;}
+        if (this.viewResolvers.isEmpty()) {return;}
+
+        for (LgViewResolver viewResolver : this.viewResolvers) {
+            LgView view = viewResolver.resolverViewName(modelAndView.getViewName());
+            // 渲染
+            view.render(modelAndView.getModel(),req,resp);
+        }
     }
 
     private LgHandlerMapping getHandler(HttpServletRequest req) {
@@ -103,27 +112,43 @@ public class LgDispatchServlet extends HttpServlet {
         // 初始化IOC容器
         applicationContext = new LgApplicationContext(config.getInitParameter("contextConfigLocation"));
         //=================MVC部分===================
+        //完成了IoC、DI和MVC部分对接
+
         // 初始化九大组件
         initStrategies(applicationContext);
-        System.out.println("============初始化HandlerMapping完成==============");
 
         System.out.println("Lg Spring framework is init.");
 
     }
 
     public void initStrategies(LgApplicationContext context) {
-        //this.initMultipartResolver(context);
-        //this.initLocaleResolver(context);
-        //this.initThemeResolver(context);
-        this.initHandlerMappings(context);
-        this.initHandlerAdapters(context);
-        //this.initHandlerExceptionResolvers(context);
-        //this.initRequestToViewNameTranslator(context);
-        this.initViewResolvers(context);
-        //this.initFlashMapManager(context);
+        //多文件上传的组件
+//        initMultipartResolver(context);
+//        //初始化本地语言环境
+//        initLocaleResolver(context);
+//        //初始化模板处理器
+//        initThemeResolver(context);
+        //handlerMapping
+        initHandlerMappings(context);
+        //初始化参数适配器
+        initHandlerAdapters(context);
+//        //初始化异常拦截器
+//        initHandlerExceptionResolvers(context);
+//        //初始化视图预处理器
+//        initRequestToViewNameTranslator(context);
+        //初始化视图转换器
+        initViewResolvers(context);
+//        //FlashMap管理器
+//        initFlashMapManager(context);
     }
 
     private void initViewResolvers(LgApplicationContext context) {
+        String templateRoot = context.getConfig().getProperty("templateRoot");
+        String templateRootPath = this.getClass().getClassLoader().getResource(templateRoot).getFile();
+        File templateRootDir = new File(templateRootPath);
+        for (File file : templateRootDir.listFiles()) {
+            this.viewResolvers.add(new LgViewResolver(templateRoot));
+        }
     }
 
     private void initHandlerAdapters(LgApplicationContext context) {

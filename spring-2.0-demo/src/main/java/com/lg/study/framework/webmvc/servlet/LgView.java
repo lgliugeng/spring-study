@@ -27,7 +27,13 @@ public class LgView {
             Matcher matcher = pattern.matcher(line);
             while (matcher.find()) {
                 String paramName = matcher.group();
+                paramName = paramName.replaceAll("￥\\{|\\}","");
+                Object paramValue = model.get(paramName);
+                line = matcher.replaceFirst(makeStringForRegExp(paramValue.toString()));
+                // 获取下一行匹配
+                matcher = pattern.matcher(line);
             }
+            sb.append(line);
         }
         resp.setCharacterEncoding("utf-8");
         resp.getWriter().write(sb.toString());
