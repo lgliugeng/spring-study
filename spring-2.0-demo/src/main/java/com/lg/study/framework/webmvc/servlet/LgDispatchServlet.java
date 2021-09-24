@@ -16,6 +16,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -91,18 +92,19 @@ public class LgDispatchServlet extends HttpServlet {
             LgView view = viewResolver.resolverViewName(modelAndView.getViewName());
             // 渲染
             view.render(modelAndView.getModel(),req,resp);
+            return;
         }
     }
 
     private LgHandlerMapping getHandler(HttpServletRequest req) {
         if (this.handlerMappings.isEmpty()) {return null;}
-        String uri = req.getRequestURI();
+        String url = req.getRequestURI();
         String contextPath = req.getContextPath();
-        String url = uri.replace(contextPath,"").replaceAll("/+","/");
+        url = url.replace(contextPath,"").replaceAll("/+","/");
         for (LgHandlerMapping mapping : this.handlerMappings) {
-            if (mapping.getUrl().equals(url)) {
-                return mapping;
-            }
+            Matcher matcher = mapping.getUrl().matcher(url);
+            if (!matcher.matches()) {continue;}
+            return mapping;
         }
         return null;
     }
