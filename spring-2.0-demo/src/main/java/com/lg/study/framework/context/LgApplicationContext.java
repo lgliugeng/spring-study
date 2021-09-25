@@ -3,6 +3,9 @@ package com.lg.study.framework.context;
 import com.lg.study.framework.annotation.LgAutowired;
 import com.lg.study.framework.annotation.LgController;
 import com.lg.study.framework.annotation.LgService;
+import com.lg.study.framework.aop.LgJdkDynamicAopProxy;
+import com.lg.study.framework.aop.config.LgAopConfig;
+import com.lg.study.framework.aop.support.LgAdvisedSupport;
 import com.lg.study.framework.beans.LgBeanWrapper;
 import com.lg.study.framework.beans.config.LgBeanDefinition;
 import com.lg.study.framework.beans.support.LgBeanDefinitionReader;
@@ -130,6 +133,22 @@ public class LgApplicationContext {
             } else {
                 Class<?> clazz = Class.forName(className);
                 instance = clazz.newInstance();
+
+                // ===============AOP开始=======================
+                // 如果满足条件，则返回proxy对象
+                // 1、加载AOP配置文件
+                LgAdvisedSupport config = instantionAopConfig(beanDefinition);
+                config.setTargetClass(clazz);
+                config.setTarget(instance);
+
+                // 2、判断规则是否生成代理类覆盖原生对象，生成代理类则覆盖原生对象
+                if (config.pointCutMatch()) {
+                    instance = new LgJdkDynamicAopProxy().getProxy();
+                }
+
+
+                // ===============AOP结束=======================
+
                 factoryBeanObjectCache.put(beanName,instance);
                 factoryBeanObjectCache.put(beanDefinition.getFactoryBeanName(),instance);
             }
@@ -137,6 +156,17 @@ public class LgApplicationContext {
             e.printStackTrace();
         }
         return instance;
+    }
+
+    private LgAdvisedSupport instantionAopConfig(LgBeanDefinition beanDefinition) {
+        LgAopConfig config = new LgAopConfig();
+        config.setPointCut(this.reader.getConfig().getProperty("pointCut"));
+        config.setAspectClass(this.reader.getConfig().getProperty("aspectClass"));
+        config.setAspectBefore(this.reader.getConfig().getProperty("aspectBefore"));
+        config.setAspectAfter(this.reader.getConfig().getProperty("aspectAfter"));
+        config.setAspectAfterThrow(this.reader.getConfig().getProperty("aspectAfterThrow"));
+        config.setAspectAfterThrowingName(this.reader.getConfig().getProperty("aspectAfterThrowingName"));
+        return new LgAdvisedSupport(config);
     }
 
     public Object getBean(Class<?> beanClass) {
