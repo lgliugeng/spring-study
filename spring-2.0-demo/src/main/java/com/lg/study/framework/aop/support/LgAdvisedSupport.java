@@ -6,6 +6,7 @@ import com.lg.study.framework.aop.config.LgAopConfig;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -53,7 +54,37 @@ public class LgAdvisedSupport {
 
         // 建立methodCache关系
         try {
+            // 获取切面类
+            Class aspectClass = Class.forName(this.config.getAspectClass());
+            Map<String,Method> aspectMethods = new HashMap<>(16);
+            // 记录所有类方法
+            for (Method method : aspectClass.getMethods()) {
+                aspectMethods.put(method.getName(),method);
+            }
 
+            // 开始封装Advice
+            for (Method method : this.targetClass.getMethods()) {
+                String methodStr = method.toString();
+                if (methodStr.contains("throws")) {
+                    methodStr = methodStr.substring(0,methodStr.lastIndexOf("throws")).trim();
+                }
+                Matcher matcher = pointCutPatter.matcher(methodStr);
+                if (matcher.matches()) {
+                    Map<String,LgAdvice> advices = new HashMap<>(16);
+                    if (null == config.getAspectBefore() || "".equals(config.getAspectBefore())) {
+                        advices.put("before",new LgAdvice(aspectClass.newInstance(),aspectMethods.get(config.getAspectBefore())));
+                    }
+                    if (null == config.getAspectAfter() || "".equals(config.getAspectAfter())) {
+                        advices.put("after",new LgAdvice(aspectClass.newInstance(),aspectMethods.get(config.getAspectAfter())));
+                    }
+                    if (null == config.getAspectAfterThrow() || "".equals(config.getAspectAfterThrow())) {
+                        LgAdvice advice = new LgAdvice(aspectClass.newInstance(),aspectMethods.get(config.getAspectAfterThrow()));
+                        advice.setThrowName(config.getAspectAfterThrowingName());
+                        advices.put("afterThrow",advice);
+                    }
+                    methodCache.put(method,advices);
+                }
+            }
         }catch (Exception e) {
 
         }
@@ -70,7 +101,7 @@ public class LgAdvisedSupport {
     }
 
     public boolean pointCutMatch() {
-        return false;
+        return pointCutClassPattern.matcher(this.targetClass.toString()).matches();
     }
 
     public void setTargetClass(Class<?> clazz) {
@@ -80,5 +111,13 @@ public class LgAdvisedSupport {
 
     public void setTarget(Object instance) {
         this.target = instance;
+    }
+
+    public Object getTarget() {
+        return target;
+    }
+
+    public Class<?> getTargetClass() {
+        return targetClass;
     }
 }

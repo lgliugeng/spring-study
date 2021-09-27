@@ -135,6 +135,7 @@ public class LgApplicationContext {
                 instance = clazz.newInstance();
 
                 // ===============AOP开始=======================
+
                 // 如果满足条件，则返回proxy对象
                 // 1、加载AOP配置文件
                 LgAdvisedSupport config = instantionAopConfig(beanDefinition);
@@ -143,9 +144,8 @@ public class LgApplicationContext {
 
                 // 2、判断规则是否生成代理类覆盖原生对象，生成代理类则覆盖原生对象
                 if (config.pointCutMatch()) {
-                    instance = new LgJdkDynamicAopProxy().getProxy();
+                    instance = new LgJdkDynamicAopProxy(config).getProxy();
                 }
-
 
                 // ===============AOP结束=======================
 

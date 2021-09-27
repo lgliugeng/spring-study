@@ -4,7 +4,9 @@ import com.lg.study.framework.aop.aspect.LgAdvice;
 import com.lg.study.framework.aop.support.LgAdvisedSupport;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.Map;
 
 /**
@@ -15,21 +17,38 @@ public class LgJdkDynamicAopProxy implements InvocationHandler {
 
     private LgAdvisedSupport config;
 
+    public LgJdkDynamicAopProxy(LgAdvisedSupport config) {
+        this.config = config;
+    }
+
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         Map<String, LgAdvice> advices = config.getAdvices(method,null);
-
+        Object returnObj;
         try {
-            //advices.get("before").invoke();
-            method.invoke(null,args);
-            //advices.get("after").invoke();
+            invokeAdvice(advices.get("before"));
+
+            returnObj = method.invoke(this.config.getTarget(),args);
+
+            invokeAdvice(advices.get("after"));
         }catch (Exception e) {
-            //advices.get("afterThrow").invoke();
+            invokeAdvice(advices.get("afterThrow"));
+            throw e;
         }
-        return null;
+        return returnObj;
+    }
+
+    private void invokeAdvice(LgAdvice advice) {
+        try {
+            advice.getAdviceMethod().invoke(advice.getAspect());
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
     }
 
     public Object getProxy() {
-        return null;
+        return Proxy.newProxyInstance(this.getClass().getClassLoader(),this.config.getTargetClass().getInterfaces(),this);
     }
 }
