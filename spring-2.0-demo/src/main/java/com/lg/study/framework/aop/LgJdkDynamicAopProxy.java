@@ -13,7 +13,7 @@ import java.util.Map;
  * 代理类
  * @author lg
  */
-public class LgJdkDynamicAopProxy implements InvocationHandler {
+public class LgJdkDynamicAopProxy implements LgAopProxy, InvocationHandler {
 
     private LgAdvisedSupport config;
 
@@ -48,7 +48,13 @@ public class LgJdkDynamicAopProxy implements InvocationHandler {
         }
     }
 
+    @Override
     public Object getProxy() {
-        return Proxy.newProxyInstance(this.getClass().getClassLoader(),this.config.getTargetClass().getInterfaces(),this);
+        return getProxy(this.getClass().getClassLoader());
+    }
+
+    @Override
+    public Object getProxy(ClassLoader classLoader) {
+        return Proxy.newProxyInstance(classLoader,this.config.getTargetClass().getInterfaces(),this);
     }
 }
